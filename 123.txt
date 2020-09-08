@@ -1,0 +1,144 @@
+11
+
+FROM centos:7
+RUN yum install -y epel-release && \
+    yum install -y nginx && \
+    yum clean all && \
+sed -i '/\:\:/s/^/#/' /etc/nginx/nginx.conf
+EXPOSE 80
+COPY index.html /usr/share/nginx/html/
+CMD ["nginx", "-g", "daemon off;"]
+
+12
+
+FROM ubuntu
+RUN apt update -y && apt install nginx -y && \
+sed -i '/\:\:/s/^/#/' /etc/nginx/nginx.conf
+EXPOSE 80
+COPY index.html /var/www/html
+CMD ["nginx","-g","daemon off;"]\
+
+13
+
+FROM alpine
+
+RUN apk update -f && \
+apk add -f nginx
+
+RUN mkdir /www
+RUN chown -R nginx:nginx /var/lib/nginx
+RUN chown -R nginx:nginx /www
+RUN rm /etc/nginx/nginx.conf
+COPY nginx.conf /etc/nginx/nginx.conf
+COPY index.html /www/
+
+EXPOSE 80
+
+CMD ["nginx", "-g", "daemon off;"]
+----------------
+nginx.conf
+---------
+
+user nginx;
+worker_processes auto; # it will be determinate automatically by the number of core
+
+error_log /var/log/nginx/error.log warn;
+pid /var/log/nginx/nginx.pid; # it permit you to use /etc/init.d/nginx reload|restart|stop|start
+
+events {
+worker_connections 1024;
+}
+
+http {
+include /etc/nginx/mime.types;
+default_type application/octet-stream;
+sendfile on;
+access_log /var/log/nginx/access.log;
+keepalive_timeout 3000;
+server {
+listen 80;
+root /www;
+index index.html index.htm;
+server_name localhost;
+client_max_body_size 32m;
+error_page 500 502 503 504 /50x.html;
+location = /50x.html {
+root /var/lib/nginx/html;
+}
+}
+}
+
+
+
+15
+----------------------------------
+FROM centos:7
+RUN yum install -y tomcat $$ \
+yum install -y tomcat-webapps
+
+EXPOSE 8080
+CMD ["/usr/libexec/tomcat/server", "start"]
+--------------------------------------------
+
+
+FROM nginx
+EXPOSE 80
+CMD echo "<head></head><body style=\"background-color:green;\"></body>">/usr/share/nginx/html/index.html && nginx -g 'daemon off;'
+
+docker run -p 127.0.0.1:80:8080/tcp ubuntu bash
+
+docker run busybox:1.28 nslookup tut.by > /var/log/nslookup_tut.by
+
+
+-----------------------------------------------------------
+docker run -d --name tomcat-man \
+--health-cmd="curl --silent --fail localhost:8080 || exit 1" \
+--health-interval=5s \
+--health-retries=12 \
+--health-timeout=2s \
+tomcat:8.5.0
+-----------------------------------------------------------
+FROM ubuntu
+
+RUN apt-get update && \
+apt-get install -y wget && \
+apt-get install -y openjdk-8-jdk && \
+wget https://archive.apache.org/dist/tomcat/tomcat-7/v7.0.32/bin/apache-tomcat-7.0.32.tar.gz && \
+tar xzvf apache-tomcat-7.0.32.tar.gz -C /opt/ && \
+mv /opt/apache-tomcat-7.0.32 /opt/tomcat && \
+rm -f apache-tomcat-7.0.32.tar.gz && \
+apt-get clean && \
+rm -rf /var/lib/apt/lists/*
+
+WORKDIR /opt/tomcat
+
+EXPOSE 8080
+
+STOPSIGNAL SIGTERM
+
+ENTRYPOINT ["bin/catalina.sh"]
+CMD ["run"]
+------------------------------------------------------------------------
+17
+
+FROM alpine
+RUN apk update -f && apk add -f curl && apk add -f unzip && apk add -f openjdk8
+RUN mkdir /usr/local/tomcat && cd /usr/local/tomcat && \
+curl -O http://archive.apache.org/dist/tomcat/tomcat-8/v8.5.9/bin/apache-tomcat-8.5.9.zip && \
+unzip -q apache-tomcat-8.5.9.zip && \
+chmod -R 774 /usr/local/tomcat/apache-tomcat-8.5.9/bin && \
+rm -f /usr/local/tomcat/apache-tomcat-8.5.9.zip
+
+EXPOSE 8080
+ENTRYPOINT ["/usr/local/tomcat/apache-tomcat-8.5.9/bin/catalina.sh","run"]
+
+---------------------------------------------------------------------------
+
+task 2:
+
+docker run -d -p 10082:80 --name c10082 -v /opt/index.html:/usr/share/nginx/html/index.html nginx
+docker run -d -p 10083:80 --name c10083 -v /usr/share/nginx/html nginx
+
+
+docker run -d -p 10087:80 --name c10087 --mount source=c10087_custom_volume,destination=/usr/share/nginx/html nginx
+docker run -d -p 10085:80 --name c10085 --volumes-from html_data nginx
